@@ -66,9 +66,9 @@ export default function Home() {
             The most secure way to share and verify sensitive documents.
           </p>
           <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', flexWrap: 'wrap' }}>
-            <a href="/dashboard" className="btn-primary">
+            <a href="/auth" className="btn-primary">
               <ShieldCheck size={20} />
-              Go to Dashboard
+              Get Started
             </a>
             <a href="/verify" style={{
               background: 'transparent',

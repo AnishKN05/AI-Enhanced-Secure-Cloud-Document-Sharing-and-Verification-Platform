@@ -7,6 +7,7 @@ import {
     XCircle, Info, Loader2, FileSearch, Fingerprint, Activity, Database, Hash, Clock
 } from 'lucide-react';
 import { generateHash, analyzeDocument } from '@/lib/crypto';
+import { getDocumentByHash } from '@/lib/documentStore';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 
@@ -19,6 +20,7 @@ function VerificationContent() {
         details: string[];
         hash: string;
         timestamp?: string;
+        documentName?: string;
     } | null>(null);
 
     const searchParams = useSearchParams();
@@ -42,11 +44,15 @@ function VerificationContent() {
             const hash = await generateHash(file);
             const analysis = await analyzeDocument(file);
 
+            // Also check if this hash exists in our store
+            const storedDoc = getDocumentByHash(hash);
+
             setResult({
-                status: analysis.status as any,
+                status: analysis.status === 'authentic' ? 'authentic' : 'suspicious',
                 details: analysis.report,
                 hash: hash,
-                timestamp: new Date().toLocaleString()
+                timestamp: new Date().toLocaleString(),
+                documentName: storedDoc?.name || file.name
             });
         } catch (err) {
             alert("Verification failed. Invalid file format.");
@@ -60,24 +66,46 @@ function VerificationContent() {
         setIsVerifying(true);
         setResult(null);
 
-        // Simulate deep database lookup
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        // Look up hash in our document store
+        await new Promise(resolve => setTimeout(resolve, 1500));
 
-        const isKnown = hash.length > 40; // Simulating valid hash length
+        const storedDoc = getDocumentByHash(hash);
 
-        setResult({
-            status: isKnown ? 'authentic' : 'not-found',
-            details: isKnown
-                ? [
-                    "SHA-256 Checksum confirmed in secure index.",
-                    "Document integrity verified 100%.",
-                    "Origin: SecureDoc Verified Corporate Channel.",
-                    "Visual fingerprint matches blockchain record."
-                ]
-                : ["No records exist for this cryptographic hash.", "Warning: Document might be forged or untracked."],
-            hash: hash,
-            timestamp: isKnown ? "21-03-2026 12:45 PM" : undefined
-        });
+        if (storedDoc) {
+            setResult({
+                status: storedDoc.status === 'authentic' ? 'authentic' : 'suspicious',
+                details: storedDoc.status === 'authentic'
+                    ? [
+                        "SHA-256 Checksum confirmed in secure index.",
+                        "Document integrity verified 100%.",
+                        `Origin document: \"${storedDoc.name}\" (${storedDoc.size})`,
+                        `Uploaded on: ${storedDoc.date}`,
+                        "Visual fingerprint matches stored record."
+                    ]
+                    : [
+                        "⚠ Document flagged as suspicious in secure index.",
+                        `Origin document: \"${storedDoc.name}\"`,
+                        "Content integrity check failed.",
+                        "Possible tampering detected."
+                    ],
+                hash: hash,
+                timestamp: storedDoc.date,
+                documentName: storedDoc.name
+            });
+        } else {
+            setResult({
+                status: 'not-found',
+                details: [
+                    "No records exist for this cryptographic hash.",
+                    "This document has not been registered in SecureDoc.",
+                    "Warning: Document might be forged or untracked.",
+                    "Recommendation: Request the sender to upload via SecureDoc first."
+                ],
+                hash: hash,
+                timestamp: undefined
+            });
+        }
+
         setIsVerifying(false);
     };
 
@@ -173,6 +201,7 @@ function VerificationContent() {
                                 <input
                                     type="text"
                                     placeholder="Paste SHA-256 hash (64 characters)..."
+                                    defaultValue={preloadHash || ''}
                                     style={{
                                         width: '100%', padding: '1.25rem 3.5rem 1.25rem 1.5rem', background: 'rgba(255,255,255,0.02)',
                                         border: '1px solid var(--border)', borderRadius: '14px', color: 'white', fontSize: '1.1rem',
@@ -222,6 +251,15 @@ function VerificationContent() {
                                         </h2>
                                     </div>
 
+                                    {result.documentName && (
+                                        <div style={{ marginBottom: '1.5rem' }}>
+                                            <p style={{ color: '#666', fontSize: '0.8rem', textTransform: 'uppercase', fontWeight: 700, marginBottom: '0.5rem', letterSpacing: '0.05em' }}>
+                                                Document Name
+                                            </p>
+                                            <p style={{ fontSize: '1.1rem', fontWeight: 600 }}>{result.documentName}</p>
+                                        </div>
+                                    )}
+
                                     <div style={{ marginBottom: '2rem' }}>
                                         <p style={{ color: '#666', fontSize: '0.8rem', textTransform: 'uppercase', fontWeight: 700, marginBottom: '0.5rem', letterSpacing: '0.05em' }}>
                                             Cryptographic Fingerprint (SHA-256)
@@ -249,10 +287,9 @@ function VerificationContent() {
                                         <p style={{ fontSize: '0.75rem', color: '#666', marginBottom: '0.5rem' }}>VERIFICATION DATE</p>
                                         <p style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '2rem' }}>{result.timestamp}</p>
                                         <div style={{ width: '120px', height: '120px', background: 'white', margin: '0 auto', padding: '0.5rem', borderRadius: '8px' }}>
-                                            {/* Simulated QR Code placeholder */}
                                             <div style={{ width: '100%', height: '100%', border: '4px solid black', display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '2px' }}>
                                                 {Array.from({ length: 16 }).map((_, i) => (
-                                                    <div key={i} style={{ background: Math.random() > 0.5 ? 'black' : 'white' }} />
+                                                    <div key={i} style={{ background: result.hash.charCodeAt(i % result.hash.length) % 2 === 0 ? 'black' : 'white' }} />
                                                 ))}
                                             </div>
                                         </div>

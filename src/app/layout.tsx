@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { ShieldCheck } from "lucide-react";
 import Link from "next/link";
+import NavBar from "./NavBar";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -19,18 +20,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={inter.className}>
-        <nav>
-          <Link href="/" className="logo">
-            <ShieldCheck size={32} color="#0070f3" />
-            SecureDoc
-          </Link>
-          <div style={{ display: 'flex', gap: '2rem', alignItems: 'center' }}>
-            <Link href="/" style={{ fontSize: '0.9rem', fontWeight: 500 }}>Home</Link>
-            <Link href="/dashboard" style={{ fontSize: '0.9rem', fontWeight: 500 }}>Dashboard</Link>
-            <Link href="/verify" style={{ fontSize: '0.9rem', fontWeight: 500 }}>Verify Portal</Link>
-            <Link href="/dashboard" className="btn-primary" style={{ padding: '0.5rem 1rem' }}>Get Started</Link>
-          </div>
-        </nav>
+        <NavBar />
         <main className="page-container">
           {children}
         </main>

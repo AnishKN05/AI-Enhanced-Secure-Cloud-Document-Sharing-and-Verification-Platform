@@ -1,36 +1,50 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     Upload, FileText, CheckCircle, AlertCircle,
-    Loader2, Share2, Shield, Eye, Clock, Hash, FileCheck, Zap
+    Loader2, Share2, Shield, Eye, Clock, Hash, FileCheck, Zap, XCircle
 } from 'lucide-react';
 import { generateHash, encryptDocument, analyzeDocument } from '@/lib/crypto';
+import { saveDocument, getAllDocuments, generateDocId, StoredDocument } from '@/lib/documentStore';
+import { getCurrentUser } from '@/lib/authStore';
 import { useRouter } from 'next/navigation';
-
-interface Document {
-    id: string;
-    name: string;
-    size: string;
-    type: string;
-    hash: string;
-    status: 'authentic' | 'suspicious';
-    date: string;
-    preview?: string;
-}
 
 export default function Dashboard() {
     const router = useRouter();
     const [isUploading, setIsUploading] = useState(false);
+    const [aiStatus, setAiStatus] = useState<'checking' | 'online' | 'offline'>('checking');
     const [steps, setSteps] = useState<{ label: string, status: 'pending' | 'loading' | 'complete' | 'error' }[]>([
         { label: 'Reading Document Data & Metadata', status: 'pending' },
         { label: 'Generating SHA-256 integrity Hash', status: 'pending' },
         { label: 'AES-256 Client-Side Encryption', status: 'pending' },
         { label: 'AI Visual & Digital Signature Scan', status: 'pending' }
     ]);
-    const [documents, setDocuments] = useState<Document[]>([]);
+    const [documents, setDocuments] = useState<StoredDocument[]>([]);
     const [analysisReport, setAnalysisReport] = useState<{ status: string, report: string[] } | null>(null);
+    const [copySuccess, setCopySuccess] = useState<string | null>(null);
+    const [userName, setUserName] = useState<string>('');
+
+    // Load stored documents and check auth on mount
+    useEffect(() => {
+        const user = getCurrentUser();
+        if (user) {
+            setUserName(user.name);
+            const stored = getAllDocuments(user.id);
+            setDocuments(stored);
+        } else {
+            setDocuments([]);
+        }
+
+        // AI Health Check simulation
+        setAiStatus('checking');
+        const timer = setTimeout(() => {
+            setAiStatus('online');
+        }, 1500);
+
+        return () => clearTimeout(timer);
+    }, []);
 
     const formatSize = (bytes: number) => {
         if (bytes === 0) return '0 Bytes';
@@ -57,15 +71,16 @@ export default function Dashboard() {
 
         setIsUploading(true);
         setAnalysisReport(null);
-        const newSteps = [...steps].map(s => ({ ...s, status: 'pending' as const }));
+        const newSteps: { label: string, status: 'pending' | 'loading' | 'complete' | 'error' }[] = [...steps].map(s => ({ ...s, status: 'pending' as const }));
         setSteps(newSteps);
 
         try {
             // Step 0: Reading
             newSteps[0].status = 'loading';
             setSteps([...newSteps]);
-            const preview = file.type.includes('text') ? await readPreview(file) : 'Binary data secured.';
-            await new Promise(r => setTimeout(r, 600)); // Sim reading
+            const preview = file.type.includes('text') || file.name.endsWith('.txt') || file.name.endsWith('.csv')
+                ? await readPreview(file) : 'Binary data secured.';
+            await new Promise(r => setTimeout(r, 600));
             newSteps[0].status = 'complete';
             setSteps([...newSteps]);
 
@@ -92,17 +107,31 @@ export default function Dashboard() {
 
             setAnalysisReport({ status: analysis.status, report: analysis.report });
 
-            const newDoc: Document = {
-                id: Math.random().toString(36).substr(2, 9),
+            // Read file as base64 for download from share page
+            const fileDataUrl = await new Promise<string>((resolve) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result as string);
+                reader.readAsDataURL(file);
+            });
+
+            const docId = generateDocId();
+            const currentUser = getCurrentUser();
+            const newDoc: StoredDocument = {
+                id: docId,
+                userId: currentUser?.id,
                 name: file.name,
                 size: formatSize(file.size),
                 type: file.type || 'Unknown Type',
                 hash: hash,
+                contentHash: hash,
                 status: analysis.status === 'authentic' ? 'authentic' : 'suspicious',
                 date: new Date().toLocaleDateString(),
-                preview: preview
+                preview: preview,
+                fileData: fileDataUrl
             };
 
+            // Save to localStorage
+            saveDocument(newDoc);
             setDocuments([newDoc, ...documents]);
         } catch (error) {
             console.error("Upload failed:", error);
@@ -112,17 +141,47 @@ export default function Dashboard() {
         }
     };
 
+    const handleShareLink = (doc: StoredDocument) => {
+        const url = `${window.location.origin}/share/${doc.id}`;
+        navigator.clipboard.writeText(url);
+        setCopySuccess(doc.id);
+        setTimeout(() => setCopySuccess(null), 2000);
+    };
+
     return (
         <div className="container" style={{ paddingTop: '2rem', paddingBottom: '4rem' }}>
             <header style={{ marginBottom: '3rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
                 <div>
-                    <h1 style={{ fontSize: '2.5rem', fontWeight: 800, marginBottom: '0.5rem', letterSpacing: '-0.02em' }}>Secure Workspace</h1>
+                    <h1 style={{ fontSize: '2.5rem', fontWeight: 800, marginBottom: '0.5rem', letterSpacing: '-0.02em' }}>
+                        {userName ? `Welcome, ${userName}` : 'Secure Workspace'}
+                    </h1>
                     <p style={{ color: '#888' }}>Total Documents: {documents.length} | Protected by AES-256</p>
                 </div>
                 <div style={{ display: 'flex', gap: '0.5rem' }}>
-                    <div className="glass-card" style={{ padding: '0.5rem 1rem', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8rem' }}>
-                        <Zap size={14} color="var(--success)" />
-                        AI Online
+                    <div className="glass-card" style={{
+                        padding: '0.5rem 1rem', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8rem'
+                    }}>
+                        {aiStatus === 'checking' ? (
+                            <>
+                                <Loader2 size={14} className="animate-spin" color="var(--accent)" />
+                                <span style={{ color: '#888' }}>Checking AI...</span>
+                            </>
+                        ) : aiStatus === 'online' ? (
+                            <>
+                                <motion.div
+                                    animate={{ scale: [1, 1.3, 1], opacity: [1, 0.6, 1] }}
+                                    transition={{ repeat: Infinity, duration: 2, ease: "easeInOut" }}
+                                >
+                                    <Zap size={14} color="var(--success)" />
+                                </motion.div>
+                                <span style={{ color: 'var(--success)', fontWeight: 600 }}>AI Online</span>
+                            </>
+                        ) : (
+                            <>
+                                <XCircle size={14} color="var(--error)" />
+                                <span style={{ color: 'var(--error)' }}>AI Offline</span>
+                            </>
+                        )}
                     </div>
                     <div className="glass-card" style={{ padding: '0.5rem 1rem', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8rem' }}>
                         <Shield size={14} color="var(--accent)" />
@@ -230,15 +289,16 @@ export default function Dashboard() {
                                             <div style={{ display: 'flex', gap: '0.75rem' }}>
                                                 <button
                                                     className="btn-primary"
-                                                    style={{ padding: '0.6rem 1.2rem', fontSize: '0.85rem', background: 'transparent', border: '1px solid var(--border)' }}
-                                                    onClick={() => {
-                                                        const url = `${window.location.origin}/verify?hash=${doc.hash}`;
-                                                        navigator.clipboard.writeText(url);
-                                                        alert('Secure verification link copied!');
+                                                    style={{
+                                                        padding: '0.6rem 1.2rem', fontSize: '0.85rem',
+                                                        background: copySuccess === doc.id ? 'rgba(0,255,136,0.1)' : 'transparent',
+                                                        border: `1px solid ${copySuccess === doc.id ? 'var(--success)' : 'var(--border)'}`,
+                                                        color: copySuccess === doc.id ? 'var(--success)' : 'white'
                                                     }}
+                                                    onClick={() => handleShareLink(doc)}
                                                 >
-                                                    <Share2 size={16} />
-                                                    Share Link
+                                                    {copySuccess === doc.id ? <CheckCircle size={16} /> : <Share2 size={16} />}
+                                                    {copySuccess === doc.id ? 'Copied!' : 'Share Link'}
                                                 </button>
                                                 <button
                                                     className="btn-primary"
@@ -252,7 +312,7 @@ export default function Dashboard() {
                                         </div>
                                         {doc.preview && (
                                             <div style={{ background: 'rgba(0,0,0,0.3)', padding: '1rem', borderRadius: '8px', fontSize: '0.85rem', color: '#888', fontStyle: 'italic', borderLeft: '3px solid var(--accent)' }}>
-                                                "{doc.preview}"
+                                                &quot;{doc.preview}&quot;
                                             </div>
                                         )}
                                     </motion.div>
