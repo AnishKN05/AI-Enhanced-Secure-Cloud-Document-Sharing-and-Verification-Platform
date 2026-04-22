@@ -4,10 +4,10 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     Upload, FileText, CheckCircle, AlertCircle,
-    Loader2, Share2, Shield, Eye, Clock, Hash, FileCheck, Zap, XCircle
+    Loader2, Share2, Shield, Eye, Clock, Hash, FileCheck, Zap, XCircle, Trash2
 } from 'lucide-react';
 import { generateHash, encryptDocument, analyzeDocument } from '@/lib/crypto';
-import { saveDocument, getAllDocuments, generateDocId, StoredDocument } from '@/lib/documentStore';
+import { saveDocument, getAllDocuments, generateDocId, deleteDocument, StoredDocument } from '@/lib/documentStore';
 import { getCurrentUser } from '@/lib/authStore';
 import { useRouter } from 'next/navigation';
 
@@ -141,11 +141,37 @@ export default function Dashboard() {
         }
     };
 
-    const handleShareLink = (doc: StoredDocument) => {
+    const handleShareLink = async (doc: StoredDocument) => {
         const url = `${window.location.origin}/share/${doc.id}`;
-        navigator.clipboard.writeText(url);
-        setCopySuccess(doc.id);
-        setTimeout(() => setCopySuccess(null), 2000);
+        try {
+            if (navigator.clipboard && window.isSecureContext) {
+                await navigator.clipboard.writeText(url);
+            } else {
+                // Fallback for non-HTTPS (localhost)
+                const textArea = document.createElement('textarea');
+                textArea.value = url;
+                textArea.style.position = 'fixed';
+                textArea.style.left = '-999px';
+                textArea.style.top = '-999px';
+                document.body.appendChild(textArea);
+                textArea.focus();
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+            }
+            setCopySuccess(doc.id);
+            setTimeout(() => setCopySuccess(null), 2000);
+        } catch (err) {
+            // Last resort: prompt the user
+            window.prompt('Copy this share link:', url);
+        }
+    };
+
+    const handleDelete = (doc: StoredDocument) => {
+        if (window.confirm(`Delete "${doc.name}"? This action cannot be undone.`)) {
+            deleteDocument(doc.id);
+            setDocuments(documents.filter(d => d.id !== doc.id));
+        }
     };
 
     return (
@@ -307,6 +333,19 @@ export default function Dashboard() {
                                                 >
                                                     <FileCheck size={16} />
                                                     Verify Portal
+                                                </button>
+                                                <button
+                                                    className="btn-primary"
+                                                    style={{
+                                                        padding: '0.6rem 1.2rem', fontSize: '0.85rem',
+                                                        background: 'transparent',
+                                                        border: '1px solid rgba(255,77,77,0.3)',
+                                                        color: 'var(--error)'
+                                                    }}
+                                                    onClick={() => handleDelete(doc)}
+                                                >
+                                                    <Trash2 size={16} />
+                                                    Delete
                                                 </button>
                                             </div>
                                         </div>

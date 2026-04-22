@@ -61,6 +61,12 @@ export function getAllDocuments(userId?: string): StoredDocument[] {
     return docs;
 }
 
+export function deleteDocument(id: string): void {
+    const docs = getDocuments();
+    const filtered = docs.filter(d => d.id !== id);
+    setDocuments(filtered);
+}
+
 export function updateDocumentFileData(id: string, fileData: string): void {
     const docs = getDocuments();
     const doc = docs.find(d => d.id === id);

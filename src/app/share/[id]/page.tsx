@@ -26,10 +26,28 @@ export default function SharePage() {
         }
     }, [id]);
 
-    const handleCopyLink = () => {
-        navigator.clipboard.writeText(window.location.href);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
+    const handleCopyLink = async () => {
+        const url = window.location.href;
+        try {
+            if (navigator.clipboard && window.isSecureContext) {
+                await navigator.clipboard.writeText(url);
+            } else {
+                const textArea = document.createElement('textarea');
+                textArea.value = url;
+                textArea.style.position = 'fixed';
+                textArea.style.left = '-999px';
+                textArea.style.top = '-999px';
+                document.body.appendChild(textArea);
+                textArea.focus();
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+            }
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+        } catch {
+            window.prompt('Copy this share link:', url);
+        }
     };
 
     const handleDownload = async () => {

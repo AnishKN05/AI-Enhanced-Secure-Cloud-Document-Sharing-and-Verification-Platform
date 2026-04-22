@@ -241,14 +241,30 @@ function VerificationContent() {
                         }}>
                             <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto', gap: '2rem' }}>
                                 <div>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.5rem' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
                                         {result.status === 'authentic' ? <CheckCircle size={32} color="var(--success)" /> :
                                             result.status === 'not-found' ? <FileSearch size={32} color="#666" /> :
                                                 <XCircle size={32} color="var(--error)" />}
                                         <h2 style={{ fontSize: '1.75rem', fontWeight: 800 }}>
                                             {result.status === 'authentic' ? 'Document Verified' :
-                                                result.status === 'not-found' ? 'Status: Not Found' : 'Verification Warning'}
+                                                result.status === 'not-found' ? 'Status: Not Found' : 'Document is FAKE & Unverified'}
                                         </h2>
+                                        {result.status === 'suspicious' && (
+                                            <span style={{
+                                                background: 'linear-gradient(135deg, #ff1744, #d50000)',
+                                                color: 'white',
+                                                padding: '0.4rem 1.2rem',
+                                                borderRadius: '50px',
+                                                fontSize: '0.85rem',
+                                                fontWeight: 800,
+                                                letterSpacing: '0.1em',
+                                                textTransform: 'uppercase',
+                                                boxShadow: '0 2px 12px rgba(255,23,68,0.4)',
+                                                animation: 'pulse 2s infinite'
+                                            }}>
+                                                ⚠ FAKE
+                                            </span>
+                                        )}
                                     </div>
 
                                     {result.documentName && (

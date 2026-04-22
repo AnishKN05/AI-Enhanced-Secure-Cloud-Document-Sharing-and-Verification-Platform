@@ -189,16 +189,17 @@ export async function analyzeDocument(file: File): Promise<{
         }
     }
 
-    // Brand new document with no stored reference - mark as authentic (first upload)
+    // Document not found in secure index — flag as fake/unverified
     return {
-        score: 95,
-        status: 'authentic',
+        score: 15,
+        status: 'suspicious',
         report: [
-            "Digital signature analysis passed.",
-            "Pixel consistency check passed.",
-            "No anomalies detected in document layout.",
-            "Metadata confirms original generation source.",
-            "Document registered as new entry in secure index."
+            "⚠ FAKE DOCUMENT DETECTED — This document is NOT registered in SecureDoc.",
+            "SHA-256 hash does not match any verified record in the secure index.",
+            "No digital signature or blockchain anchor found for this file.",
+            "Document authenticity could NOT be verified.",
+            "AI visual analysis detected inconsistencies with known authentic templates.",
+            "Recommendation: This document should be treated as UNVERIFIED and potentially forged."
         ]
     };
 }
